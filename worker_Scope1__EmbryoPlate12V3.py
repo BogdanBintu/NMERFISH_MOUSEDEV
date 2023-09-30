@@ -276,8 +276,8 @@ if __name__ == '__main__':
     #for ifov in range(180,195):
     #for item in [('_D16', 181), ('_D16', 183), ('_D16', 188), ('_D16', 190), ('_D16', 192)]:
         #main_f(item,try_mode=True)
-    main_f(['_D9',20],try_mode=False)
+    main_f(['_D9',15],try_mode=False)
     if False:
-        with Pool(processes=3) as pool:
+        with Pool(processes=2) as pool:
             print('starting pool')
             result = pool.map(main_f, items)

@@ -2132,16 +2132,19 @@ class decoder_simple():
                     tag = os.path.basename(fld)
                     save_fl = save_folder+os.sep+fov.split('.')[0]+'--'+tag+'--col'+str(icol)+'__Xhfits.npy.npz'
                     if not os.path.exists(save_fl):save_fl = save_fl.replace('.npy','')
-                    Xh = np.load(save_fl)['Xh']
-                    Xh = Xh[Xh[:,-1]>th_h]
-                    tzxy = drifts[iH][0]
-                    Xh[:,:3]+=tzxy# drift correction
-                    ih = get_iH(fld) # get bit
-                    is_low = 'low' in tag
-                    bit = ((ih-1)%nbits)*ncols+icol+0.5*is_low
-                    icolR = np.array([[icol,bit]]*len(Xh))
-                    XH_ = np.concatenate([Xh,icolR],axis=-1)
-                    XH.extend(XH_)
+                    try:
+                        Xh = np.load(save_fl)['Xh']
+                        Xh = Xh[Xh[:,-1]>th_h]
+                        tzxy = drifts[iH][0]
+                        Xh[:,:3]+=tzxy# drift correction
+                        ih = get_iH(fld) # get bit
+                        is_low = 'low' in tag
+                        bit = ((ih-1)%nbits)*ncols+icol+0.5*is_low
+                        icolR = np.array([[icol,bit]]*len(Xh))
+                        XH_ = np.concatenate([Xh,icolR],axis=-1)
+                        XH.extend(XH_)
+                    except:
+                        print("Failed:",save_fl)
         self.XH = np.array(XH)
     def get_inters(self,dinstance_th=2,enforce_color=False):
         """Get an initial intersection of points and save in self.res"""

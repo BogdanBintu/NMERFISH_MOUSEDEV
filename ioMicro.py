@@ -3725,34 +3725,6 @@ class get_dapi_features:
 
 
 
-def get_im_from_Xh(Xh,resc=5):
-    X = np.round(Xh[:,:3]/resc).astype(int)
-    #X-=np.min(X,axis=0)
-    sz = np.max(X,axis=0)
-    imf = np.zeros(sz+1,dtype=np.float32)
-    imf[tuple(X.T)]=1
-    return imf
-def get_Xtzxy(X,X_ref,tzxy0,resc,learn=1,return_counts=False):
-    tzxy = tzxy0
-    for it_ in range(5):
-        XT = X-tzxy
-        ds,inds = cKDTree(X_ref).query(XT)
-        keep = ds<resc*learn**it_
-        X_ref_ = X_ref[inds[keep]]
-        X_ = X[keep]
-        tzxy = np.mean(X_-X_ref_,axis=0)
-        #print(tzxy)
-    if return_counts:
-        return tzxy,len(X_)
-    return tzxy
-def get_best_translation_points(X,X_ref,resc=10,return_counts=False):
-    im = get_im_from_Xh(X,resc=resc)
-    im_ref = get_im_from_Xh(X_ref,resc=resc)
-    from scipy.signal import fftconvolve
-    im_cor = fftconvolve(im,im_ref[::-1,::-1,::-1])
-    tzxy = np.array(np.unravel_index(np.argmax(im_cor),im_cor.shape))-im_ref.shape+1###changed to im_ref.shape
-    tzxy = tzxy*resc
-    return get_Xtzxy(X,X_ref,tzxy,return_counts=return_counts)
 def load_segmentation(dec,segm_folder =  r'\\merfish8\merfish8v2\20230805_D103_Myh67_d80KO\DNA_singleCy5\AnalysisDeconvolve_CG\SegmentationDAPI_CG',tag='H1_R1',th_vol=5000):
     dec.fl_dapi = segm_folder+os.sep+dec.fov+'--'+tag+'--CYTO_segm.npz'
     dic = np.load(dec.fl_dapi)
@@ -3845,31 +3817,41 @@ def get_dic_fov_cells(cp):
     cp.dic_fov_cells = {cp.fovs[ifov]:cp.icells_out_fov[ifovs_cells==ifov] for ifov in ifovsE}
     cp.dic_fov_cells[cp.fov]=cp.icells_in_fov
 
-def get_im_from_Xh(Xh,resc=5):
+def get_im_from_Xh(Xh,resc=5,pad=10):
     X = np.round(Xh[:,:3]/resc).astype(int)
     Xm = np.min(X,axis=0)
-    X-=Xm
+    XM = np.max(X,axis=0)
+    keep = X<=(XM-[0,pad,pad])
+    keep &= X>=(Xm+[0,pad,pad])
+    keep = np.all(keep,-1)
+    X = X[keep]
+    if False:
+        Xm = np.min(X,axis=0)
+        X-=Xm
+    else:
+        Xm=np.array([0,0,0])
+    
     sz = np.max(X,axis=0)
     imf = np.zeros(sz+1,dtype=np.float32)
     imf[tuple(X.T)]=1
     return imf,Xm
-def get_Xtzxy(X,X_ref,tzxy0,resc,learn=0.8):
+def get_Xtzxy(X,X_ref,tzxy0,resc,target=3):
     tzxy = tzxy0
     Npts =0
-    for it_ in range(5):
+    for dist_th in np.linspace(resc,target,5):
         XT = X-tzxy
         ds,inds = cKDTree(X_ref).query(XT)
-        keep = ds<resc*learn**it_
+        keep = ds<dist_th
         X_ref_ = X_ref[inds[keep]]
         X_ = X[keep]
         tzxy = np.mean(X_-X_ref_,axis=0)
         #print(tzxy)
         Npts = np.sum(keep)
     return tzxy,Npts
-def get_best_translation_points(X,X_ref,resc=10,learn=1,return_counts=False):
+def get_best_translation_points(X,X_ref,resc=5,pad=10,target=3,return_counts=False):
     
-    im,Xm = get_im_from_Xh(X,resc=resc)
-    im_ref,Xm_ref = get_im_from_Xh(X_ref,resc=resc)
+    im,Xm = get_im_from_Xh(X,resc=resc,pad=pad)
+    im_ref,Xm_ref = get_im_from_Xh(X_ref,resc=resc,pad=pad)
     
     from scipy.signal import fftconvolve
     im_cor = fftconvolve(im,im_ref[::-1,::-1,::-1])
@@ -3877,10 +3859,11 @@ def get_best_translation_points(X,X_ref,resc=10,learn=1,return_counts=False):
     tzxy = np.array(np.unravel_index(np.argmax(im_cor),im_cor.shape))-im_ref.shape+1+Xm-Xm_ref
     tzxy = tzxy*resc
     Npts=0
-    tzxy,Npts = get_Xtzxy(X,X_ref,tzxy,resc=resc,learn=learn)
+    tzxy,Npts = get_Xtzxy(X,X_ref,tzxy,resc=resc,target=target)
     if return_counts:
         return tzxy,Npts
     return tzxy
+
 
 def get_info_cp_fl(cp):
     cp.fovT,htag,coltag = os.path.basename(cp.fl).split('--')
